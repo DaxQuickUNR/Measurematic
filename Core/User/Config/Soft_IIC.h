@@ -3,9 +3,6 @@
 
 #include "DEV_Config.h"
 
-#define IIC_SOFT_SCL_PIN         IIC_SCL_SOFT_Pin
-#define IIC_SOFT_SDA_PIN         IIC_SDA_SOFT_Pin
-
 #define IIC_SOFT_SCL_GPIO        GPIOC
 #define IIC_SOFT_SDA_GPIO        GPIOC
 

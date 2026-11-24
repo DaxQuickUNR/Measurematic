@@ -63,14 +63,13 @@ void Error_Handler(void);
 #define USART_TX_GPIO_Port GPIOA
 #define USART_RX_Pin GPIO_PIN_3
 #define USART_RX_GPIO_Port GPIOA
-#define IIC_SCL_SOFT_Pin GPIO_PIN_6
-#define IIC_SCL_SOFT_GPIO_Port GPIOC
-#define IIC_SDA_SOFT_Pin GPIO_PIN_8
-#define IIC_SDA_SOFT_GPIO_Port GPIOC
-#define OLED_DC_Pin GPIO_PIN_12
-#define OLED_DC_GPIO_Port GPIOA
+#define Trigger_Button_Pin GPIO_PIN_8
+#define Trigger_Button_GPIO_Port GPIOA
+#define Trigger_Button_EXTI_IRQn EXTI9_5_IRQn
 #define OLED_RST_Pin GPIO_PIN_11
 #define OLED_RST_GPIO_Port GPIOA
+#define OLED_DC_Pin GPIO_PIN_12
+#define OLED_DC_GPIO_Port GPIOA
 #define OLED_CS_Pin GPIO_PIN_6
 #define OLED_CS_GPIO_Port GPIOB
 

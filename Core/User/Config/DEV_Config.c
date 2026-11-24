@@ -6,15 +6,13 @@
 * | function		:	Provide the hardware underlying interface	
 ******************************************************************************/
 #include "DEV_Config.h"
-#include "stm32f4xx_hal_i2c.h"
-#include "i2c.h"
-#include "stm32f4xx_hal_spi.h"
-#include "spi.h"
-#include "Soft_IIC.h"
+#include "main.h"
 #include <stdio.h>		//printf()
 #include <string.h>
 #include <stdlib.h>
-#include "usart.h"
+
+extern SPI_HandleTypeDef hspi1;
+extern I2C_HandleTypeDef hi2c1;
 
 /********************************************************************************
 function:	System Init
@@ -63,8 +61,8 @@ uint8_t SPI4W_Write_Byte(uint8_t value)
 
 void I2C_Write_Byte(uint8_t value, uint8_t Cmd)
 {
-    int Err;
-    uint8_t W_Buf[2] ;
+    int Err = 0;
+    uint8_t W_Buf[2];
     W_Buf[0] = Cmd;
     W_Buf[1] = value;
     if(HAL_I2C_Master_Transmit(&hi2c1, (I2C_ADR << 1) | 0X00, W_Buf, 2, 0x10) != HAL_OK) {
