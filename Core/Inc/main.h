@@ -67,9 +67,9 @@ void Error_Handler(void);
 #define IIC_SCL_SOFT_GPIO_Port GPIOC
 #define IIC_SDA_SOFT_Pin GPIO_PIN_8
 #define IIC_SDA_SOFT_GPIO_Port GPIOC
-#define OLED_DC_Pin GPIO_PIN_8
+#define OLED_DC_Pin GPIO_PIN_12
 #define OLED_DC_GPIO_Port GPIOA
-#define OLED_RST_Pin GPIO_PIN_9
+#define OLED_RST_Pin GPIO_PIN_11
 #define OLED_RST_GPIO_Port GPIOA
 #define OLED_CS_Pin GPIO_PIN_6
 #define OLED_CS_GPIO_Port GPIOB
