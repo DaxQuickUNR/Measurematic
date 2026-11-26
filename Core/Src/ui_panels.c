@@ -6,6 +6,8 @@
  *
  * Font widths in this project: Font8=5, Font12=7, Font16=11, Font20=14,
  * Font24=17 px per character (heights 8/12/16/20/24).
+ *
+ * All distances handed to this file are in CENTIMETRES.
  *****************************************************************************/
 #include "ui_panels.h"
 #include "GUI_Paint.h"
@@ -20,17 +22,16 @@
 #define FRAME_BYTES      ((OLED_1IN51_WIDTH / 8) * OLED_1IN51_HEIGHT)   /* 1024 */
 
 /* ---- Strings (edit here).  Every string must fit its font/width. -------- */
-#define STR_BOOTING      "SYSTEM BOOTING"
 #define STR_READY        "SYSTEM READY"
-#define STR_SWITCH       "SWITCH MODE?"
-#define STR_AGAIN        "AGAIN?"
-#define STR_DIST_A       "DISTANCE TO TARGET A"
-#define STR_DIST         "DISTANCE TO TARGET"
+#define STR_CRUX         "CRUX 1.0"
+#define STR_PROMPT_1     "HOLD UPRIGHT &"
+#define STR_PROMPT_2     "PRESS YELLOW"
+#define STR_DIST_A       "DISTANCE TO TARGET"
 #define STR_BETWEEN      "DISTANCE BETWEEN TARGETS:"
 /* "DISTANCE TO TARGET A: 12.32m" is 28 chars = 140 px, wider than the 128 px
  * screen even in the smallest font, so the A/B lines are abbreviated.       */
-#define STR_LINE_A       "DIST TO TARGET A: "
-#define STR_LINE_B       "DIST TO TARGET B: "
+#define STR_LINE_A       "DISTANCE TO A: "
+#define STR_LINE_B       "DISTANCE TO B: "
 /* Crosshair quadrants are only ~61 px wide ("RANGE FINDER" / "FIRST TARGET"
  * would be 60 px and touch the lines), so each message wraps to 3 lines.    */
 #define STR_MODE_RANGE   { "MODE:",  "RANGE",  "FINDER" }
@@ -40,6 +41,7 @@
 
 /* ---- Progress-bar look -------------------------------------------------- */
 #define BAR_X            10
+#define BAR_Y            42
 #define BAR_W            108
 #define BAR_H            10
 #define BAR_PAD          1      /* gap between outline and fill (px)         */
@@ -54,13 +56,16 @@ static UBYTE s_frame[FRAME_BYTES];
  * ========================================================================= */
 
 /* Inclusive filled rectangle (Paint_DrawRectangle's fill excludes the last
- * row, so we do our own). Clipped to the screen. */
+ * row, so we do our own). Clipped to the screen; an empty or fully
+ * off-screen rectangle draws nothing. */
 static void fill_rect(int x0, int y0, int x1, int y1)
 {
     if (x0 < 0) x0 = 0;
     if (y0 < 0) y0 = 0;
     if (x1 > SCR_W - 1) x1 = SCR_W - 1;
     if (y1 > SCR_H - 1) y1 = SCR_H - 1;
+    if (x1 < x0 || y1 < y0) return;
+
     for (int y = y0; y <= y1; y++) {
         for (int x = x0; x <= x1; x++) {
             Paint_SetPixel((UWORD)x, (UWORD)y, WHITE);
@@ -90,7 +95,7 @@ static void text_centered(int x_left, int x_right, int y, const char *s, sFONT *
     Paint_DrawString_EN((UWORD)x, (UWORD)y, s, f, WHITE, BLACK);
 }
 
-/* "12.32m" from millimetres, integer maths only (no float printf needed).
+/* "12.32m" from centimetres, integer maths only (no float printf needed).
  * Negative = invalid reading -> "--.--m". */
 static void format_meters(char *buf, size_t n, int32_t cm)
 {
@@ -121,22 +126,29 @@ static void draw_progress_bar(int x, int y, int w, int h, uint8_t pct)
 }
 
 /* Three-line message inside a bottom crosshair quadrant (Font8, 9 px pitch). */
-static void quadrant_text(int qx0, int qx1, const char *const lines[3])
-{
-    for (int i = 0; i < 3; i++) {
-        text_centered(qx0, qx1, 35 + 9 * i, lines[i], &Font8);
-    }
-}
+//static void quadrant_text(int qx0, int qx1, const char *const lines[3])
+//{
+//    for (int i = 0; i < 3; i++) {
+//        text_centered(qx0, qx1, 35 + 9 * i, lines[i], &Font8);
+//    }
+//}
 
 /* =========================================================================
  * Panel renderers (draw into s_frame only; UI_ShowPanel flushes)
  * ========================================================================= */
 
-/* Title (Font12) with a progress bar underneath. Panels 1 and 4. */
-static void render_title_bar(const char *title, uint8_t pct)
+/* Two-line prompt (Font12) with a progress bar underneath. Panel 1 (BOOTING). */
+static void render_boot(uint8_t pct)
 {
-    text_centered(0, SCR_W - 1, 15, title, &Font12);
-    draw_progress_bar(BAR_X, 36, BAR_W, BAR_H, pct);
+    static const char *const lines[] = { STR_PROMPT_1, STR_PROMPT_2 };
+    sFONT *f = &Font12;
+
+    const int count = (int)(sizeof(lines) / sizeof(lines[0]));
+    for (int i = 0; i < count; i++) {
+        text_centered(0, SCR_W - 1, 6 + i * (int)f->Height, lines[i], f);
+    }
+
+    draw_progress_bar(BAR_X, BAR_Y, BAR_W, BAR_H, pct);
 }
 
 static void render_crosshair(int two_point)
@@ -151,15 +163,15 @@ static void render_crosshair(int two_point)
     fill_rect(0, SCR_H / 2 - XH_LINE / 2, SCR_W - 1, SCR_H / 2 + XH_LINE / 2 - 1);
 
     /* bottom-left: MODE, bottom-right: AIM prompt (interior of each quadrant) */
-    static const char *const mode_range[3] = STR_MODE_RANGE;
-    static const char *const mode_two[3]   = STR_MODE_TWO;
-    static const char *const aim_first[3]  = STR_AIM_FIRST;
-    static const char *const aim_next[3]   = STR_AIM_NEXT;
+//    static const char *const mode_range[3] = STR_MODE_RANGE;
+//    static const char *const mode_two[3]   = STR_MODE_TWO;
+//    static const char *const aim_first[3]  = STR_AIM_FIRST;
+//    static const char *const aim_next[3]   = STR_AIM_NEXT;
 
-    quadrant_text(XH_LINE, SCR_W / 2 - XH_LINE / 2 - 1,
-                  two_point ? mode_two : mode_range);
-    quadrant_text(SCR_W / 2 + XH_LINE / 2, SCR_W - XH_LINE - 1,
-                  two_point ? aim_next : aim_first);
+//    quadrant_text(XH_LINE, SCR_W / 2 - XH_LINE / 2 - 1,
+//                  two_point ? mode_two : mode_range);
+//    quadrant_text(SCR_W / 2 + XH_LINE / 2, SCR_W - XH_LINE - 1,
+//                  two_point ? aim_next : aim_first);
 }
 
 /* Small title over a boxed distance value. Panels 5 and 6. */
@@ -170,7 +182,7 @@ static void render_distance_box(const char *title, int32_t cm)
 
     text_centered(0, SCR_W - 1, 10, title, &Font8);
 
-    const int bx0 = 12, bx1 = 115, by0 = 26, by1 = 55;
+    const int bx0 = 12, bx1 = 115, by0 = 21, by1 = 50;
     outline_rect(bx0, by0, bx1, by1);
 
     /* biggest font that fits with >= 5 px side margin inside the box:
@@ -186,8 +198,11 @@ static void render_between(const UI_Data_t *d)
 
     text_centered(0, SCR_W - 1, 2, STR_BETWEEN, &Font8);
 
+    const int bx0 = 12, bx1 = 115, by0 = 11, by1 = 40; //
+    outline_rect(bx0, by0, bx1, by1);
+
     format_meters(val, sizeof(val), d->between_cm);
-    text_centered(0, SCR_W - 1, 15, val, &Font16);
+    text_centered(0, SCR_W - 1, 17, val, &Font20);
 
     format_meters(val, sizeof(val), d->target_a_cm);
     snprintf(line, sizeof(line), "%s%s", STR_LINE_A, val);
@@ -204,7 +219,7 @@ static void render_panel(UI_Panel_t panel, const UI_Data_t *d)
 
     switch (panel) {
     case UI_PANEL_BOOTING:
-        render_title_bar(STR_BOOTING, d->progress_pct);
+        render_boot(d->progress_pct);
         break;
     case UI_PANEL_READY:
         text_centered(0, SCR_W - 1, (SCR_H - (int)Font12.Height) / 2, STR_READY, &Font12);
@@ -212,24 +227,19 @@ static void render_panel(UI_Panel_t panel, const UI_Data_t *d)
     case UI_PANEL_CROSSHAIR_RANGE:
         render_crosshair(0);
         break;
-    case UI_PANEL_SWITCH_MODE:
-        render_title_bar(STR_SWITCH, d->progress_pct);
-        break;
-    case UI_PANEL_DIST_TARGET_A:
+    case UI_PANEL_DIST_TARGET:
         render_distance_box(STR_DIST_A, d->distance_cm);
         break;
-    case UI_PANEL_DIST_TARGET:
-        render_distance_box(STR_DIST, d->distance_cm);
-        break;
-    case UI_PANEL_CROSSHAIR_TWO:
+    case UI_PANEL_CROSSHAIR_TWO: //removed the text
         render_crosshair(1);
         break;
     case UI_PANEL_DIST_BETWEEN:
         render_between(d);
         break;
     case UI_PANEL_AGAIN:
-        text_centered(0, SCR_W - 1, (SCR_H - (int)Font24.Height) / 2, STR_AGAIN, &Font24);
+        text_centered(0, SCR_W - 1, (SCR_H - (int)Font20.Height) / 2, STR_CRUX, &Font20);
         break;
+    case UI_PANEL_SWITCH_MODE:      /* unused: draws a blank screen */
     default:
         break;
     }
@@ -289,8 +299,8 @@ static void test_animate_bar(UI_Panel_t panel, UI_Data_t *d)
 
 void UI_Test_Cycle(void)
 {
-    /* values from the mockup */
-    UI_Data_t d = { 0, 12320, 12320, 12320, 12320 };
+    /* sample values: 1232 cm shows as 12.32m */
+    UI_Data_t d = { 0, 1232, 1232, 1232, 1232 };
 
     UI_Init();
 
@@ -298,7 +308,11 @@ void UI_Test_Cycle(void)
         for (int p = 0; p < (int)UI_PANEL_COUNT; p++) {
             UI_Panel_t panel = (UI_Panel_t)p;
 
-            if (panel == UI_PANEL_BOOTING || panel == UI_PANEL_SWITCH_MODE) {
+            if (panel == UI_PANEL_SWITCH_MODE) {
+                continue;                       /* panel is unused */
+            }
+
+            if (panel == UI_PANEL_BOOTING) {
                 test_animate_bar(panel, &d);
             } else {
                 UI_ShowPanel(panel, &d);

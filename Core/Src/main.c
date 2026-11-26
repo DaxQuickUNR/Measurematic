@@ -126,7 +126,9 @@ int32_t off_ax, off_ay, off_az, off_gx, off_gy, off_gz;
 volatile uint32_t last_edge_tick = 0;
 volatile uint8_t  edge_flag = 0;
 static GPIO_PinState last_state;
-
+//MPU6050
+static uint8_t mpu_ok = 0;        /* 1 = MPU6050_Init succeeded */
+static uint8_t calibrated = 0;    /* 1 = offsets measured, recording allowed */
 //recording (flat array: ax, ay, az, gx, gy, gz, ax, ay, ...)
 static int16_t  rec[MAX_SAMPLES * CH_COUNT];
 static uint32_t rec_n = 0;          /* samples stored so far */
@@ -222,12 +224,21 @@ void MPU6050_Calibrate(void)
     int32_t sax = 0, say = 0, saz = 0, sgx = 0, sgy = 0, sgz = 0;
     const int N = 200;
 
+    UI_Data_t cal = {0};
+    UI_ShowPanel(UI_PANEL_BOOTING, &cal);               // bar at 0%
+
     for (int i = 0; i < N; i++)
     {
         while (MPU6050_ReadAll() != HAL_OK) { }
         sax += ax; say += ay; saz += az;
         sgx += gx; sgy += gy; sgz += gz;
         HAL_Delay(5);
+
+        if (i % 20 == 19)                               // 10 updates over the run
+        {
+            cal.progress_pct = (uint8_t)(((i + 1) * 100) / N);
+            UI_ShowPanel(UI_PANEL_BOOTING, &cal);
+        }
     }
 
     off_ax = sax / N;
@@ -523,6 +534,7 @@ static void report_distance(int press_type)
         	UI_Data_t ui = {0};
 			ui.distance_cm = (int32_t)dist_press;
 			UI_ShowPanel(UI_PANEL_DIST_TARGET, &ui);
+
 			len = snprintf(buf, sizeof(buf), "Distance:%u cm\r\n", (unsigned)dist_press);
         }
         else
@@ -577,9 +589,16 @@ static void report_distance(int press_type)
 
             fmt_deg(a, sizeof(a), res_total_deg);
             distanceAB_calc(dist_press, dist_release, res_total_deg);
-            len = snprintf(buf, sizeof(buf), "Angle Change: %s deg\r\n", a);
+
+            UI_Data_t ui = {0};
+            ui.target_a_cm = (int32_t)dist_press;
+            ui.target_b_cm = (int32_t)dist_release;
+            ui.between_cm  = (int32_t)(distanceAB + 0.5f);   // +0.5 rounds instead of cutting off
+            UI_ShowPanel(UI_PANEL_DIST_BETWEEN, &ui);
+
+			len = snprintf(buf, sizeof(buf), "Angle Change: %s deg\r\n", a);
             HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
-            //
+
             len = snprintf(buf, sizeof(buf), "Distance from A to B: %u cm\r\nDistance A: %u cm\r\nDistance B: %u cm\r\n",
                            (unsigned)distanceAB, (unsigned)dist_press, (unsigned)dist_release);
         }
@@ -629,15 +648,19 @@ int main(void)
   /* USER CODE BEGIN 2 */
   //UI_Test_Cycle();   /* TEMP: cycles all 9 UI panels forever; replace with the real state machine */
   UI_Init();
-//  UI_Data_t ui = {0};
-//  ui.distance_cm = dist_press_ok ? (int32_t)dist_press * 10 : -1;   // -1 shows "--.--m"
-//  UI_ShowPanel(UI_PANEL_DIST_TARGET, &ui);
+  //UI_Data_t = {0};
+  UI_ShowPanel(UI_PANEL_AGAIN, NULL);
+  HAL_Delay(5000);
 
+  UI_ShowPanel(UI_PANEL_BOOTING, NULL);   // prompt text with an empty bar
 
   //Trigger Button
   last_state = HAL_GPIO_ReadPin(Trigger_Button_GPIO_Port, Trigger_Button_Pin);
   //LiDAR (USART1 receive interrupt)
   lidar_init();
+
+
+
   //MPU6050
   uint8_t status = MPU6050_Init();
   if (status != 0)
@@ -648,11 +671,10 @@ int main(void)
   }
   else
   {
-      MPU6050_Calibrate();   // keep the board flat and still while this runs (~1 s)
+      mpu_ok = 1;
 
-      char rdy[48];
-      int n = snprintf(rdy, sizeof(rdy), "Ready, %d Hz. Hold the button to record.\r\n", SAMPLE_RATE_HZ);
-      HAL_UART_Transmit(&huart2, (uint8_t*)rdy, n, 100);
+      char rdy[] = "Press the button to calibrate (keep the board flat and still).\r\n";
+      HAL_UART_Transmit(&huart2, (uint8_t*)rdy, sizeof(rdy) - 1, 100);
   }
   /* USER CODE END 2 */
 
@@ -664,6 +686,7 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  HAL_SPI_MspInit(&hspi1);   // BSP_LED_Init took PA5 (SCK) away from SPI1; give it back
   while (1)
   {
     /* USER CODE END WHILE */
@@ -687,18 +710,44 @@ int main(void)
 
             if (state == GPIO_PIN_RESET)
             {
-                // FALLING edge: button pressed (active low) -> start recording
-                dist_press_ok = lidar_get_distance(&dist_press);   // LiDAR reading at press
-                rec_n = 0;
-                rec_error = 0;
-                rec_full = 0;
-                fifo_start();
-                press_tick = HAL_GetTick();
-                last_drain = press_tick;
-                recording = 1;
+            	if (!calibrated)
+            	    {
+            	        // FIRST press: calibrate instead of recording
+            	        if (!mpu_ok)
+            	        {
+            	            HAL_UART_Transmit(&huart2, (uint8_t*)"MPU not ready\r\n", 15, 100);
+            	        }
+            	        else
+            	        {
+            	            HAL_UART_Transmit(&huart2, (uint8_t*)"Calibrating, keep still...\r\n", 28, 100);
+            	            HAL_Delay(300);                 // let the board settle after the click
+            	            MPU6050_Calibrate();            // ~1 s
+            	            calibrated = 1;
 
-                char msg[] = "\n\n\n\nRecording...\r\n";
-                HAL_UART_Transmit(&huart2, (uint8_t*)msg, sizeof(msg) - 1, 100);
+            	            edge_flag = 0;                  // forget any bounce or release seen during calibration
+            	            last_state = HAL_GPIO_ReadPin(Trigger_Button_GPIO_Port, Trigger_Button_Pin);
+
+            	            UI_ShowPanel(UI_PANEL_READY, NULL);
+            	            HAL_UART_Transmit(&huart2, (uint8_t*)"Calibrated. Hold the button to record.\r\n", 40, 100);
+            	        }
+            	    }
+            	else
+            	{
+					// FALLING edge: button pressed (active low) -> start recording
+					dist_press_ok = lidar_get_distance(&dist_press);   // LiDAR reading at press
+					rec_n = 0;
+					rec_error = 0;
+					rec_full = 0;
+					fifo_start();
+					press_tick = HAL_GetTick();
+					last_drain = press_tick;
+					recording = 1;
+
+					UI_ShowPanel(UI_PANEL_CROSSHAIR_TWO, NULL);
+
+					char msg[] = "\n\n\n\nRecording...\r\n";
+					HAL_UART_Transmit(&huart2, (uint8_t*)msg, sizeof(msg) - 1, 100);
+            	}
             }
             else if (recording)
             {
