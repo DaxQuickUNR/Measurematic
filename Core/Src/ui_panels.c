@@ -92,15 +92,14 @@ static void text_centered(int x_left, int x_right, int y, const char *s, sFONT *
 
 /* "12.32m" from millimetres, integer maths only (no float printf needed).
  * Negative = invalid reading -> "--.--m". */
-static void format_meters(char *buf, size_t n, int32_t mm)
+static void format_meters(char *buf, size_t n, int32_t cm)
 {
-    if (mm < 0) {
+    if (cm < 0) {
         snprintf(buf, n, "--.--m");
         return;
     }
-    uint32_t cm = ((uint32_t)mm + 5U) / 10U;            /* round to 0.01 m */
     snprintf(buf, n, "%lu.%02lum",
-             (unsigned long)(cm / 100U), (unsigned long)(cm % 100U));
+             (unsigned long)(cm / 100), (unsigned long)(cm % 100));
 }
 
 /* Progress bar: 1 px outline, fill grows left to right with pct (0..100). */
@@ -164,10 +163,10 @@ static void render_crosshair(int two_point)
 }
 
 /* Small title over a boxed distance value. Panels 5 and 6. */
-static void render_distance_box(const char *title, int32_t mm)
+static void render_distance_box(const char *title, int32_t cm)
 {
     char val[16];
-    format_meters(val, sizeof(val), mm);
+    format_meters(val, sizeof(val), cm);
 
     text_centered(0, SCR_W - 1, 10, title, &Font8);
 
@@ -187,14 +186,14 @@ static void render_between(const UI_Data_t *d)
 
     text_centered(0, SCR_W - 1, 2, STR_BETWEEN, &Font8);
 
-    format_meters(val, sizeof(val), d->between_mm);
+    format_meters(val, sizeof(val), d->between_cm);
     text_centered(0, SCR_W - 1, 15, val, &Font16);
 
-    format_meters(val, sizeof(val), d->target_a_mm);
+    format_meters(val, sizeof(val), d->target_a_cm);
     snprintf(line, sizeof(line), "%s%s", STR_LINE_A, val);
     text_centered(0, SCR_W - 1, 44, line, &Font8);
 
-    format_meters(val, sizeof(val), d->target_b_mm);
+    format_meters(val, sizeof(val), d->target_b_cm);
     snprintf(line, sizeof(line), "%s%s", STR_LINE_B, val);
     text_centered(0, SCR_W - 1, 54, line, &Font8);
 }
@@ -217,10 +216,10 @@ static void render_panel(UI_Panel_t panel, const UI_Data_t *d)
         render_title_bar(STR_SWITCH, d->progress_pct);
         break;
     case UI_PANEL_DIST_TARGET_A:
-        render_distance_box(STR_DIST_A, d->distance_mm);
+        render_distance_box(STR_DIST_A, d->distance_cm);
         break;
     case UI_PANEL_DIST_TARGET:
-        render_distance_box(STR_DIST, d->distance_mm);
+        render_distance_box(STR_DIST, d->distance_cm);
         break;
     case UI_PANEL_CROSSHAIR_TWO:
         render_crosshair(1);

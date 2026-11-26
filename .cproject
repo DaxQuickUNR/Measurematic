@@ -50,11 +50,11 @@
 									<listOptionValue builtIn="false" value="../Drivers/BSP/STM32F4xx-Nucleo"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Device/ST/STM32F4xx/Include"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Include"/>
-									<listOptionValue builtIn="false" value="&quot;/Users/vytis/Desktop/Rangefinder on STM32/Rangefinder/Core/User/Config&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;/Users/vytis/Desktop/Rangefinder on STM32/Rangefinder/Core/User/Example&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;/Users/vytis/Desktop/Rangefinder on STM32/Rangefinder/Core/User/Fonts&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;/Users/vytis/Desktop/Rangefinder on STM32/Rangefinder/Core/User/GUI&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;/Users/vytis/Desktop/Rangefinder on STM32/Rangefinder/Core/User/OLED&quot;"/>
+									<listOptionValue builtIn="false" value="/Users/vytis/Documents/GitHub/Measurematic/Core/User/Config"/>
+									<listOptionValue builtIn="false" value="/Users/vytis/Documents/GitHub/Measurematic/Core/User/Example"/>
+									<listOptionValue builtIn="false" value="/Users/vytis/Documents/GitHub/Measurematic/Core/User/Fonts"/>
+									<listOptionValue builtIn="false" value="/Users/vytis/Documents/GitHub/Measurematic/Core/User/GUI"/>
+									<listOptionValue builtIn="false" value="/Users/vytis/Documents/GitHub/Measurematic/Core/User/OLED"/>
 								</option>
 								<inputType id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c.2051086477" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c"/>
 							</tool>
@@ -133,6 +133,16 @@
 									<listOptionValue builtIn="false" value="../Drivers/BSP/STM32F4xx-Nucleo"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Device/ST/STM32F4xx/Include"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Include"/>
+									<listOptionValue builtIn="false" value="/Users/vytis/Documents/GitHub/Measurematic/Debug/Core/User/Config"/>
+									<listOptionValue builtIn="false" value="/Users/vytis/Documents/GitHub/Measurematic/Debug/Core/User/Example"/>
+									<listOptionValue builtIn="false" value="/Users/vytis/Documents/GitHub/Measurematic/Debug/Core/User/Fonts"/>
+									<listOptionValue builtIn="false" value="/Users/vytis/Documents/GitHub/Measurematic/Debug/Core/User/GUI"/>
+									<listOptionValue builtIn="false" value="/Users/vytis/Documents/GitHub/Measurematic/Debug/Core/User/OLED"/>
+									<listOptionValue builtIn="false" value="/Users/vytis/Documents/GitHub/Measurematic/Core/User/Config"/>
+									<listOptionValue builtIn="false" value="/Users/vytis/Documents/GitHub/Measurematic/Core/User/Example"/>
+									<listOptionValue builtIn="false" value="/Users/vytis/Documents/GitHub/Measurematic/Core/User/Fonts"/>
+									<listOptionValue builtIn="false" value="/Users/vytis/Documents/GitHub/Measurematic/Core/User/GUI"/>
+									<listOptionValue builtIn="false" value="/Users/vytis/Documents/GitHub/Measurematic/Core/User/OLED"/>
 								</option>
 								<inputType id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c.1571281294" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c"/>
 							</tool>
@@ -182,4 +192,12 @@
 		</scannerConfigBuildInfo>
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
+	<storageModule moduleId="refreshScope" versionNumber="2">
+		<configuration configurationName="Debug">
+			<resource resourceType="PROJECT" workspacePath="/Rangefinder"/>
+		</configuration>
+		<configuration configurationName="Release">
+			<resource resourceType="PROJECT" workspacePath="/Rangefinder"/>
+		</configuration>
+	</storageModule>
 </cproject>

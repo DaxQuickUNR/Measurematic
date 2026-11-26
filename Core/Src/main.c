@@ -90,6 +90,8 @@ typedef struct
    the HAL tick is 1 ms and the window ends are only known to a few ms). */
 #define USE_MEASURED_DT       0
 
+#define Short_Press_Length	  150           //Length of User Interface Logic Press
+
 
 /* Kalman filter tuning (all angles in degrees) */
 #define KF_Q_ANGLE            0.002f        /* deg^2/s   : gyro angle noise. Larger = trust accel more */
@@ -141,6 +143,8 @@ float res_roll0 = 0, res_roll1 = 0;
 float res_pitch0 = 0, res_pitch1 = 0;
 float res_yaw = 0;                  /* change in yaw, gyro only */
 float res_total_deg = 0;            /* single angle between the start and end orientations */
+float deg_total_rad = 0;
+float distanceAB = 0;
 //LiDAR distances (sensor units, see lidar.c), one per button event
 uint16_t dist_press = 0, dist_release = 0;
 static uint8_t dist_press_ok = 0, dist_release_ok = 0;   /* 1 = a frame was available */
@@ -492,78 +496,99 @@ static void estimate_angles(void)
 /* Prints a float as degrees with 2 decimals (nano newlib has no %f) */
 static void fmt_deg(char *out, size_t n, float deg)
 {
-    long c = (long)(deg * 100.0f);   /* centi-degrees */
+    long c = (long)(deg * 100.0f);   // centi-degrees
     snprintf(out, n, "%s%ld.%02ld", (c < 0) ? "-" : "", labs(c) / 100, labs(c) % 100);
 }
 
-/* Runs the estimator and prints the start, end and change in angle */
-static void report_recording(void)
+static void distanceAB_calc(unsigned dist_press, unsigned dist_release, float res_total_deg)
 {
-    char buf[128];
-    char a[16], b[16], c[16];
-    int len;
-
-    if (rec_error)
-    {
-        len = snprintf(buf, sizeof(buf), "ERROR: FIFO overflow or I2C failure, recording invalid\r\n");
-        HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
-        return;
-    }
-
-    if (rec_n < 2)
-    {
-        len = snprintf(buf, sizeof(buf), "Recording too short (%lu samples)\r\n", (unsigned long)rec_n);
-        HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
-        return;
-    }
-
-    estimate_angles();
-
-    len = snprintf(buf, sizeof(buf), "Hold:%lu ms  Samples:%lu (%lu ms at %d Hz)%s\r\n",
-                   (unsigned long)hold_ms,
-                   (unsigned long)rec_n,
-                   (unsigned long)(rec_n * 1000UL / SAMPLE_RATE_HZ),
-                   SAMPLE_RATE_HZ,
-                   rec_full ? "  BUFFER FULL, truncated" : "");
-    HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
-
-    fmt_deg(a, sizeof(a), res_roll0);
-    fmt_deg(b, sizeof(b), res_roll1);
-    fmt_deg(c, sizeof(c), res_roll1 - res_roll0);
-    len = snprintf(buf, sizeof(buf), "Roll  start:%s end:%s delta:%s deg\r\n", a, b, c);
-    HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
-
-    fmt_deg(a, sizeof(a), res_pitch0);
-    fmt_deg(b, sizeof(b), res_pitch1);
-    fmt_deg(c, sizeof(c), res_pitch1 - res_pitch0);
-    len = snprintf(buf, sizeof(buf), "Pitch start:%s end:%s delta:%s deg\r\n", a, b, c);
-    HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
-
-    fmt_deg(a, sizeof(a), res_yaw);
-    len = snprintf(buf, sizeof(buf), "Yaw   delta:%s deg (gyro only)\r\n", a);
-    HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
-
-    fmt_deg(a, sizeof(a), res_total_deg);
-    len = snprintf(buf, sizeof(buf), "Total angle change: %s deg\r\n", a);
-    HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
+	deg_total_rad = res_total_deg * (3.141592653589793 / 180);
+	distanceAB = sqrt(pow(dist_press, 2) + pow(dist_release, 2) - (2 * dist_press * dist_release * cos(deg_total_rad)));
+//    long c = (long)(deg * 100.0f);   // centi-degrees
+//    snprintf(out, n, "%s%ld.%02ld", (c < 0) ? "-" : "", labs(c) / 100, labs(c) % 100);
 }
 
 /* Prints the two LiDAR distances captured at press and release */
-static void report_distance(void)
+/* Prints LiDAR distance(s). press_type: 0 = short press, 1 = long press */
+/* Prints LiDAR distance(s). press_type: 0 = short press, 1 = long press */
+static void report_distance(int press_type)
 {
-    char buf[64];
-    int len;
+    char buf[128];
+    int len = 0;
 
-    if (!dist_press_ok || !dist_release_ok)
+    if (press_type == 0)   // Short press: press distance only
     {
-        len = snprintf(buf, sizeof(buf), "LiDAR: no frames received\r\n");
+        if (dist_press_ok)
+        {
+        	UI_Data_t ui = {0};
+			ui.distance_cm = (int32_t)dist_press;
+			UI_ShowPanel(UI_PANEL_DIST_TARGET, &ui);
+			len = snprintf(buf, sizeof(buf), "Distance:%u cm\r\n", (unsigned)dist_press);
+        }
+        else
+            len = snprintf(buf, sizeof(buf), "LiDAR: no frame\r\n");
     }
-    else
+    else if (press_type == 1)   // Long press: both distances
     {
-        len = snprintf(buf, sizeof(buf), "LiDAR press:%u release:%u\r\n",
-                       (unsigned)dist_press, (unsigned)dist_release);
+        if (dist_press_ok && dist_release_ok)
+        {
+            //
+            char a[16]; //, b[16], c[16];
+
+            if (rec_error)
+            {
+                len = snprintf(buf, sizeof(buf), "ERROR: FIFO overflow or I2C failure, recording invalid\r\n");
+                HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
+                return;
+            }
+
+            if (rec_n < 2)
+            {
+                len = snprintf(buf, sizeof(buf), "Recording too short (%lu samples)\r\n", (unsigned long)rec_n);
+                HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
+                return;
+            }
+
+            estimate_angles();
+
+        //    len = snprintf(buf, sizeof(buf), "Hold:%lu ms  Samples:%lu (%lu ms at %d Hz)%s\r\n",
+        //                   (unsigned long)hold_ms,
+        //                   (unsigned long)rec_n,
+        //                   (unsigned long)(rec_n * 1000UL / SAMPLE_RATE_HZ),
+        //                   SAMPLE_RATE_HZ,
+        //                   rec_full ? "  BUFFER FULL, truncated" : "");
+        //    HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
+        //
+        //    fmt_deg(a, sizeof(a), res_roll0);
+        //    fmt_deg(b, sizeof(b), res_roll1);
+        //    fmt_deg(c, sizeof(c), res_roll1 - res_roll0);
+        //    len = snprintf(buf, sizeof(buf), "Roll  start:%s end:%s delta:%s deg\r\n", a, b, c);
+        //    HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
+        //
+        //    fmt_deg(a, sizeof(a), res_pitch0);
+        //    fmt_deg(b, sizeof(b), res_pitch1);
+        //    fmt_deg(c, sizeof(c), res_pitch1 - res_pitch0);
+        //    len = snprintf(buf, sizeof(buf), "Pitch start:%s end:%s delta:%s deg\r\n", a, b, c);
+        //    HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
+        //
+        //    fmt_deg(a, sizeof(a), res_yaw);
+        //    len = snprintf(buf, sizeof(buf), "Yaw   delta:%s deg (gyro only)\r\n", a);
+        //    HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
+
+            fmt_deg(a, sizeof(a), res_total_deg);
+            distanceAB_calc(dist_press, dist_release, res_total_deg);
+            len = snprintf(buf, sizeof(buf), "Angle Change: %s deg\r\n", a);
+            HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
+            //
+            len = snprintf(buf, sizeof(buf), "Distance from A to B: %u cm\r\nDistance A: %u cm\r\nDistance B: %u cm\r\n",
+                           (unsigned)distanceAB, (unsigned)dist_press, (unsigned)dist_release);
+        }
+        else
+            len = snprintf(buf, sizeof(buf), "LiDAR: no frames received\r\n");
     }
-    HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
+
+    if (len > 0)
+        HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
 }
 
 /* USER CODE END 0 */
@@ -603,6 +628,10 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   //UI_Test_Cycle();   /* TEMP: cycles all 9 UI panels forever; replace with the real state machine */
+  UI_Init();
+//  UI_Data_t ui = {0};
+//  ui.distance_cm = dist_press_ok ? (int32_t)dist_press * 10 : -1;   // -1 shows "--.--m"
+//  UI_ShowPanel(UI_PANEL_DIST_TARGET, &ui);
 
 
   //Trigger Button
@@ -628,10 +657,10 @@ int main(void)
   /* USER CODE END 2 */
 
   /* Initialize leds */
-  BSP_LED_Init(LED2);
+  //BSP_LED_Init(LED2);
 
   /* Initialize USER push-button, will be used to trigger an interrupt each time it's pressed.*/
-  BSP_PB_Init(BUTTON_USER, BUTTON_MODE_EXTI);
+  //BSP_PB_Init(BUTTON_USER, BUTTON_MODE_EXTI);
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -641,7 +670,6 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     // While recording, empty the MPU FIFO every 5 ms (it holds ~85 ms at 1 kHz).
-    // Avoid long blocking calls in here while the button is held.
     if (recording && (HAL_GetTick() - last_drain) >= 5)
     {
         last_drain = HAL_GetTick();
@@ -669,20 +697,31 @@ int main(void)
                 last_drain = press_tick;
                 recording = 1;
 
-                char msg[] = "Recording...\r\n";
+                char msg[] = "\n\n\n\nRecording...\r\n";
                 HAL_UART_Transmit(&huart2, (uint8_t*)msg, sizeof(msg) - 1, 100);
             }
             else if (recording)
             {
-                // RISING edge: button released -> note the time, grab the rest, stop, report
-                dist_release_ok = lidar_get_distance(&dist_release);   // LiDAR reading at release
+                // RISING edge: button released get timing
                 release_tick = HAL_GetTick();
                 hold_ms = release_tick - press_tick;
                 fifo_drain();
                 fifo_stop();
                 recording = 0;
-                report_recording();
-                report_distance();
+
+                if (hold_ms <= Short_Press_Length)
+                {
+                    // SHORT: 1 target (press only)
+                    dist_release_ok = 0;        // no release reading, don't print stale one
+                    report_distance(0);
+                }
+                else
+                {
+                    // LONG: 2 targets + AB distance + angle change
+                    dist_release_ok = lidar_get_distance(&dist_release);
+                    //report_recording();
+                    report_distance(1);
+                }
             }
         }
     }

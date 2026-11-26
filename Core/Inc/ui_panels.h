@@ -43,15 +43,13 @@ typedef enum {
     UI_PANEL_COUNT
 } UI_Panel_t;
 
-/* ---- Values the panels display ------------------------------------------
- * Distances are in MILLIMETRES (no floating point needed).  A negative value
- * is shown as "--.--m" (e.g. "no valid reading").                           */
+/* ---- Values the panels display ------------------------------------------                        */
 typedef struct {
     uint8_t progress_pct;   /* 0..100: UI_PANEL_BOOTING, UI_PANEL_SWITCH_MODE */
-    int32_t distance_mm;    /* UI_PANEL_DIST_TARGET_A, UI_PANEL_DIST_TARGET   */
-    int32_t target_a_mm;    /* UI_PANEL_DIST_BETWEEN                          */
-    int32_t target_b_mm;    /* UI_PANEL_DIST_BETWEEN                          */
-    int32_t between_mm;     /* UI_PANEL_DIST_BETWEEN                          */
+    int32_t distance_cm;    /* UI_PANEL_DIST_TARGET_A, UI_PANEL_DIST_TARGET   */
+    int32_t target_a_cm;    // UI_PANEL_DISTA
+    int32_t target_b_cm;    // UI_PANEL_DISTB
+    int32_t between_cm;     // UI_PANEL_DIST_BETWEEN
 } UI_Data_t;
 
 /* Initialise the display and the drawing buffer. Call once. */
