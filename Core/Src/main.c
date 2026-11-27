@@ -90,7 +90,7 @@ typedef struct
    the HAL tick is 1 ms and the window ends are only known to a few ms). */
 #define USE_MEASURED_DT       0
 
-#define Short_Press_Length	  150           //Length of User Interface Logic Press
+#define Short_Press_Length	  250           //Length of User Interface Logic Press
 
 
 /* Kalman filter tuning (all angles in degrees) */
